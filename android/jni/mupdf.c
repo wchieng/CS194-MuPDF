@@ -230,7 +230,13 @@ renderer(void *data)
 	fz_pixmap *pix = ((struct thread_data *) data)->pix;
 	fz_matrix ctm = ((struct thread_data *) data)->ctm;
 	int thread_id = ((struct thread_data *) data)->thread_id;
-	bbox.x1 = (bbox.x1 + bbox.x0)/2;
+	
+	if (thread_id == 0) {
+		bbox.x1 = (bbox.x1 + bbox.x0)/2;
+	} else if (thread_id == 1) {
+		bbox.x0 = (bbox.x1 + bbox.x0)/2;
+	}
+	
 	// The context pointer is pointing to the main thread's
 	// context, so here we create a new context based on it for
 	// use in this thread.
@@ -326,7 +332,7 @@ Java_com_artifex_mupdf_MuPDFCore_drawPage(JNIEnv *env, jobject thiz, jobject bit
 		pix = fz_new_pixmap_with_bbox_and_data(ctx, colorspace, rect, pixels);		
 		dev = fz_new_draw_device(ctx, pix);
 		
-		int count = 1;
+		int count = 2;
 		int j = 0;
 		pthread_t thread[count];
 		struct thread_data *data = malloc(count * sizeof (struct thread_data));
