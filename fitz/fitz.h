@@ -1803,7 +1803,11 @@ fz_device *fz_new_list_device(fz_context *ctx, fz_display_list *list);
 	progress information back to the caller. The fields inside
 	cookie are continually updated while the page is being run.
 */
+<<<<<<< HEAD
 void fz_run_display_list(fz_display_list *list, fz_device *dev, fz_matrix ctm, fz_bbox area, fz_cookie *cookie);
+=======
+void fz_run_display_list(fz_display_list *list, fz_device *dev, fz_matrix ctm, fz_bbox area, fz_cookie *cookie, fz_context *ctx, fz_pixmap *pix);
+>>>>>>> 646fc97f1668107ef3af02c087f5bb86167de5b9
 
 /*
 	fz_free_display_list: Frees a display list.

@@ -1,0 +1,8 @@
+MSYS-1.0.17 Build:2011-04-24 23:39
+Exception: STATUS_ACCESS_VIOLATION at eip=00000000
+eax=685537BC ebx=685538C4 ecx=0001B008 edx=000000D8 esi=00000000 edi=685500D4
+ebp=0022FEC8 esp=0022FEAC program=f:\ruby\bin\lessecho.exe
+cs=001B ds=0023 es=0023 fs=003B gs=0000 ss=0023
+Stack trace:
+Frame     Function  Args
+End of stack trace
