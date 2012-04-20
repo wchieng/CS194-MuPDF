@@ -955,7 +955,7 @@ pdf_cache_object(pdf_document *xref, int num, int gen)
 	pdf_xref_entry *x;
 	int rnum, rgen;
 	fz_context *ctx = xref->ctx;
-
+	LOGE("Entering cache object");
 	if (num < 0 || num >= xref->len)
 		fz_throw(ctx, "object out of range (%d %d R); xref size %d", num, gen, xref->len);
 
@@ -966,12 +966,15 @@ pdf_cache_object(pdf_document *xref, int num, int gen)
 
 	if (x->type == 'f')
 	{
+		LOGE("Type f");
 		x->obj = pdf_new_null(ctx);
 		return;
 	}
 	else if (x->type == 'n')
 	{
+		LOGE("Type n");
 		fz_lock(ctx, FZ_LOCK_FILE);
+		LOGE("Got lock!");
 		fz_seek(xref->file, x->ofs, 0);
 
 		fz_try(ctx)
@@ -999,6 +1002,7 @@ pdf_cache_object(pdf_document *xref, int num, int gen)
 	}
 	else if (x->type == 'o')
 	{
+		LOGE("Type o");
 		if (!x->obj)
 		{
 			fz_try(ctx)

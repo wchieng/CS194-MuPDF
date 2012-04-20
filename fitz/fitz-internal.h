@@ -46,14 +46,18 @@ static inline void
 fz_lock(fz_context *ctx, int lock)
 {
 	fz_lock_debug_lock(ctx, lock);
+	LOGE("Trying to obtain lock");
 	ctx->locks->lock(ctx->locks->user, lock);
+	LOGE("Obtained lock");
 }
 
 static inline void
 fz_unlock(fz_context *ctx, int lock)
 {
 	fz_lock_debug_unlock(ctx, lock);
+	LOGE("Trying to unlock");
 	ctx->locks->unlock(ctx->locks->user, lock);
+	LOGE("Unlocked");
 }
 
 

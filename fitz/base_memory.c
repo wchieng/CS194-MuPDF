@@ -317,13 +317,13 @@ void fz_lock_debug_lock(fz_context *ctx, int lock)
 
 	if (fz_locks_debug[idx][lock] != 0)
 	{
-		fprintf(stderr, "Attempt to take lock %d when held already!\n", lock);
+		//fprintf(stderr, "Attempt to take lock %d when held already!\n", lock);
 	}
 	for (i = lock-1; i >= 0; i--)
 	{
 		if (fz_locks_debug[idx][i] != 0)
 		{
-			fprintf(stderr, "Lock ordering violation: Attempt to take lock %d when %d held already!\n", lock, i);
+			//fprintf(stderr, "Lock ordering violation: Attempt to take lock %d when %d held already!\n", lock, i);
 		}
 	}
 	fz_locks_debug[idx][lock] = 1;

@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <pthread.h>
 
 #include "fitz.h"
 #include "mupdf.h"
@@ -35,6 +36,28 @@ fz_context *ctx;
 int currentPageNumber = -1;
 fz_page *currentPage = NULL;
 fz_bbox *hit_bbox = NULL;
+fz_locks_context locks;	
+pthread_mutex_t mutex[FZ_LOCK_MAX];
+	
+void lock_mutex(void *user, int lock)
+{
+	//char buffer[50];
+	//sprintf(buffer, "Locking mutex %d", lock );
+	pthread_mutex_t *mutex = (pthread_mutex_t *) user;
+	//LOGE(buffer);
+	if (pthread_mutex_lock(&mutex[lock]) < 0)
+		LOGE("pthread_mutex_lock() fail");
+}
+
+void unlock_mutex(void *user, int lock)
+{
+	//char buffer[50];
+	//sprintf(buffer, "Unlocking mutex %d", lock );
+	pthread_mutex_t *mutex = (pthread_mutex_t *) user;
+	//LOGE(buffer);
+	if (pthread_mutex_unlock(&mutex[lock]) < 0)
+		LOGE("pthread_mutex_unlock() fail");
+}
 
 JNIEXPORT int JNICALL
 Java_com_artifex_mupdf_MuPDFCore_openFile(JNIEnv * env, jobject thiz, jstring jfilename)
@@ -43,6 +66,7 @@ Java_com_artifex_mupdf_MuPDFCore_openFile(JNIEnv * env, jobject thiz, jstring jf
 	int pages = 0;
 	int result = 0;
 
+
 	filename = (*env)->GetStringUTFChars(env, jfilename, NULL);
 	if (filename == NULL)
 	{
@@ -50,8 +74,21 @@ Java_com_artifex_mupdf_MuPDFCore_openFile(JNIEnv * env, jobject thiz, jstring jf
 		return 0;
 	}
 
+	int j = 0;
+	
+	for (j = 0; j < FZ_LOCK_MAX; j++)
+	{
+		pthread_mutex_init(&mutex[j], NULL);
+		LOGE("Pthread mutex init");
+	}
+	locks.user = mutex;
+	locks.lock = lock_mutex;
+	locks.unlock = unlock_mutex;
+	
 	/* 128 MB store for low memory devices. Tweak as necessary. */
-	ctx = fz_new_context(NULL, NULL, 128 << 20);
+	ctx = fz_new_context(NULL, &locks, 256 << 20);
+	//ctx = fz_new_context(NULL, NULL, 256 << 20);
+	
 	if (!ctx)
 	{
 		LOGE("Failed to initialise context");
@@ -156,6 +193,60 @@ Java_com_artifex_mupdf_MuPDFCore_getPageHeight(JNIEnv *env, jobject thiz)
 	return pageHeight;
 }
 
+struct thread_data {
+
+	int thread_id;
+	// A pointer to the original context in the main thread sent
+	// from main to rendering thread. It will be used to create
+	// each rendering thread's context clone.
+	fz_context *ctx;
+
+	// The display list as obtained by the main thread and sent
+	// from main to rendering thread. This contains the drawing
+	// commands (text, images, etc.) for the page that should be
+	// rendered.
+	fz_display_list *list;
+
+	// The area of the page to render as obtained by the main
+	// thread and sent from main to rendering thread.
+	fz_bbox bbox;
+
+	// This is the result, a pixmap containing the rendered page.
+	// It is passed first from main thread to the rendering
+	// thread, then its samples are changed by the rendering
+	// thread, and then back from the rendering thread to the main
+	// thread.
+	fz_pixmap *pix;
+	
+	fz_matrix ctm;
+};
+
+void *
+renderer(void *data)
+{
+	fz_context *ctx = ((struct thread_data *) data)->ctx;
+	fz_display_list *list = ((struct thread_data *) data)->list;
+	fz_bbox bbox = ((struct thread_data *) data)->bbox;
+	fz_pixmap *pix = ((struct thread_data *) data)->pix;
+	fz_matrix ctm = ((struct thread_data *) data)->ctm;
+	int thread_id = ((struct thread_data *) data)->thread_id;
+	bbox.x1 = (bbox.x1 + bbox.x0)/2;
+	// The context pointer is pointing to the main thread's
+	// context, so here we create a new context based on it for
+	// use in this thread.
+	fz_context *ctx2 = fz_clone_context(ctx);
+
+	fz_device *dev = fz_new_draw_device(ctx2, pix);
+	//fz_run_display_list(list, dev, fz_identity, bbox, NULL);
+	fz_run_display_list(list, dev, ctm, bbox, NULL);
+	fz_free_device(dev);
+
+	// This threads context is freed.
+
+	fz_free_context(ctx2);
+	return data;
+}
+
 JNIEXPORT jboolean JNICALL
 Java_com_artifex_mupdf_MuPDFCore_drawPage(JNIEnv *env, jobject thiz, jobject bitmap,
 		int pageW, int pageH, int patchX, int patchY, int patchW, int patchH)
@@ -167,11 +258,11 @@ Java_com_artifex_mupdf_MuPDFCore_drawPage(JNIEnv *env, jobject thiz, jobject bit
 	float zoom;
 	fz_matrix ctm;
 	fz_bbox bbox;
-	fz_pixmap *pix = NULL;
+	//fz_pixmap *pix = NULL;
 	float xscale, yscale;
 	fz_bbox rect;
 
-	fz_var(pix);
+	//fz_var(pix);
 	fz_var(dev);
 
 	LOGI("In native method\n");
@@ -209,40 +300,88 @@ Java_com_artifex_mupdf_MuPDFCore_drawPage(JNIEnv *env, jobject thiz, jobject bit
 		rect.y0 = patchY;
 		rect.x1 = patchX + patchW;
 		rect.y1 = patchY + patchH;
-		pix = fz_new_pixmap_with_bbox_and_data(ctx, colorspace, rect, pixels);
+		
+		/*pix = fz_new_pixmap_with_bbox_and_data(ctx, colorspace, rect, pixels);
 		if (currentPageList == NULL)
 		{
 			fz_clear_pixmap_with_value(ctx, pix, 0xd0);
 			break;
 		}
-		fz_clear_pixmap_with_value(ctx, pix, 0xff);
-
+		fz_clear_pixmap_with_value(ctx, pix, 0xcc);
+		*/
+		
+		
 		zoom = resolution / 72;
 		ctm = fz_scale(zoom, zoom);
 		bbox = fz_round_rect(fz_transform_rect(ctm,currentMediabox));
 		/* Now, adjust ctm so that it would give the correct page width
 		 * heights. */
-		xscale = (float)pageW/(float)(bbox.x1-bbox.x0);
+		xscale = (float)(pageW)/(float)(bbox.x1-bbox.x0);
 		yscale = (float)pageH/(float)(bbox.y1-bbox.y0);
 		ctm = fz_concat(ctm, fz_scale(xscale, yscale));
 		bbox = fz_round_rect(fz_transform_rect(ctm,currentMediabox));
-		dev = fz_new_draw_device(ctx, pix);
-#ifdef TIME_DISPLAY_LIST
-		{
-			clock_t time;
-			int i;
 
-			LOGE("Executing display list");
-			time = clock();
-			for (i=0; i<100;i++) {
-#endif
-				fz_run_display_list(currentPageList, dev, ctm, bbox, NULL);
-#ifdef TIME_DISPLAY_LIST
+
+		fz_pixmap *pix = NULL;
+		pix = fz_new_pixmap_with_bbox_and_data(ctx, colorspace, rect, pixels);		
+		dev = fz_new_draw_device(ctx, pix);
+		
+		int count = 1;
+		int j = 0;
+		pthread_t thread[count];
+		struct thread_data *data = malloc(count * sizeof (struct thread_data));
+		for (j = 0; j < count; j++) {
+			
+			//fz_pixmap *pix = NULL;
+			
+			//pix = fz_new_pixmap_with_bbox(ctx, fz_device_rgb, bbox);
+			
+			if (currentPageList == NULL)
+			{
+				fz_clear_pixmap_with_value(ctx, pix, 0xd0);
+				break;
 			}
-			time = clock() - time;
-			LOGE("100 renders in %d (%d per sec)", time, CLOCKS_PER_SEC);
+			fz_clear_pixmap_with_value(ctx, pix, 0xff);
+		
+			
+			data[j].ctx = ctx;
+			data[j].list = currentPageList;
+			data[j].bbox = bbox;
+			data[j].pix = pix;
+			data[j].ctm = ctm;
+			data[j].thread_id = j;
+			
+			#ifdef TIME_DISPLAY_LIST
+			{
+				clock_t time;
+				int i;		
+				LOGE("Executing display list");
+				time = clock();
+				for (i=0; i<100;i++) {
+			#endif
+				LOGE("Creating Pthread..");
+				if (pthread_create(&thread[j], NULL, renderer, &data[j]) < 0) {
+					LOGE("FAILED TO CREATE PTHREAD");
+				}
+				//fz_run_display_list(currentPageList, dev, ctm, bbox, NULL);
+			#ifdef TIME_DISPLAY_LIST
+				}
+				time = clock() - time;
+				LOGE("100 renders in %d (%d per sec)", time, CLOCKS_PER_SEC);
+				}
+			#endif
+			//fz_free_device(dev);
 		}
-#endif
+		
+		for (j = count - 1; j >= 0; j--)
+		{
+			struct thread_data *data;
+			if (pthread_join(thread[j], (void **) &data) < 0) {
+				LOGE("Failed to perform pthreadpthread_join");
+			}
+			//fz_drop_pixmap(ctx, data->pix);
+		}
+		
 		fz_free_device(dev);
 		dev = NULL;
 		fz_drop_pixmap(ctx, pix);
