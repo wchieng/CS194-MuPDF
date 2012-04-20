@@ -9,7 +9,7 @@ GEN := generated
 
 default: all
 
-CFLAGS += -Ifitz -Ipdf -Ixps -Icbz -Iscripts
+CFLAGS += $(XCFLAGS) -Ifitz -Ipdf -Ixps -Icbz -Iscripts
 LIBS += -lfreetype -ljbig2dec -ljpeg -lopenjpeg -lz -lm
 
 include Makerules
@@ -145,6 +145,16 @@ $(MUPDF) : $(FITZ_LIB) $(THIRD_LIBS)
 $(MUPDF) : $(addprefix $(OUT)/, x11_main.o x11_image.o pdfapp.o)
 	$(LINK_CMD) $(X11_LIBS)
 endif
+
+# --- Format man pages ---
+
+%.txt: %.1
+	nroff -man $< | col -b | expand > $@
+
+MAN_FILES := $(wildcard apps/man/*.1)
+TXT_FILES := $(MAN_FILES:%.1=%.txt)
+
+catman: $(TXT_FILES)
 
 # --- Install ---
 

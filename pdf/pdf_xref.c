@@ -955,11 +955,7 @@ pdf_cache_object(pdf_document *xref, int num, int gen)
 	pdf_xref_entry *x;
 	int rnum, rgen;
 	fz_context *ctx = xref->ctx;
-<<<<<<< HEAD
-	LOGE("Entering cache object");
-=======
 
->>>>>>> 646fc97f1668107ef3af02c087f5bb86167de5b9
 	if (num < 0 || num >= xref->len)
 		fz_throw(ctx, "object out of range (%d %d R); xref size %d", num, gen, xref->len);
 
@@ -970,22 +966,12 @@ pdf_cache_object(pdf_document *xref, int num, int gen)
 
 	if (x->type == 'f')
 	{
-<<<<<<< HEAD
-		LOGE("Type f");
-=======
->>>>>>> 646fc97f1668107ef3af02c087f5bb86167de5b9
 		x->obj = pdf_new_null(ctx);
 		return;
 	}
 	else if (x->type == 'n')
 	{
-<<<<<<< HEAD
-		LOGE("Type n");
 		fz_lock(ctx, FZ_LOCK_FILE);
-		LOGE("Got lock!");
-=======
-		fz_lock(ctx, FZ_LOCK_FILE);
->>>>>>> 646fc97f1668107ef3af02c087f5bb86167de5b9
 		fz_seek(xref->file, x->ofs, 0);
 
 		fz_try(ctx)
@@ -1013,10 +999,6 @@ pdf_cache_object(pdf_document *xref, int num, int gen)
 	}
 	else if (x->type == 'o')
 	{
-<<<<<<< HEAD
-		LOGE("Type o");
-=======
->>>>>>> 646fc97f1668107ef3af02c087f5bb86167de5b9
 		if (!x->obj)
 		{
 			fz_try(ctx)
@@ -1200,6 +1182,81 @@ static void pdf_free_page_shim(fz_document *doc, fz_page *page)
 	pdf_free_page((pdf_document*)doc, (pdf_page*)page);
 }
 
+static int pdf_meta(fz_document *doc_, int key, void *ptr, int size)
+{
+	pdf_document *doc = (pdf_document *)doc_;
+
+	switch(key)
+	{
+	/*
+		ptr: Pointer to block (uninitialised on entry)
+		size: Size of block (at least 64 bytes)
+		Returns: Document format as a brief text string.
+	*/
+	case FZ_META_FORMAT_INFO:
+		sprintf((char *)ptr, "PDF %d.%d", doc->version/10, doc->version % 10);
+		return FZ_META_OK;
+	case FZ_META_CRYPT_INFO:
+		if (doc->crypt)
+			sprintf((char *)ptr, "Standard V%d %d-bit %s",
+				pdf_crypt_revision(doc),
+				pdf_crypt_length(doc),
+				pdf_crypt_method(doc));
+		else
+			sprintf((char *)ptr, "None");
+		return FZ_META_OK;
+	case FZ_META_HAS_PERMISSION:
+	{
+		int i;
+		switch (size)
+		{
+		case FZ_PERMISSION_PRINT:
+			i = PDF_PERM_PRINT;
+			break;
+		case FZ_PERMISSION_CHANGE:
+			i = PDF_PERM_CHANGE;
+			break;
+		case FZ_PERMISSION_COPY:
+			i = PDF_PERM_COPY;
+			break;
+		case FZ_PERMISSION_NOTES:
+			i = PDF_PERM_NOTES;
+			break;
+		default:
+			return 0;
+		}
+		return pdf_has_permission(doc, size);
+	}
+	case FZ_META_INFO:
+	{
+		pdf_obj *info = pdf_dict_gets(doc->trailer, "Info");
+		if (!info)
+		{
+			if (ptr)
+				*(char *)ptr = 0;
+			return 0;
+		}
+		info = pdf_dict_gets(info, *(char **)ptr);
+		if (!info)
+		{
+			if (ptr)
+				*(char *)ptr = 0;
+			return 0;
+		}
+		if (info && ptr && size)
+		{
+			char *utf8 = pdf_to_utf8(doc->ctx, info);
+			strncpy(ptr, utf8, size);
+			((char *)ptr)[size-1] = 0;
+			fz_free(doc->ctx, utf8);
+		}
+		return 1;
+	}
+	default:
+		return FZ_META_UNKNOWN_KEY;
+	}
+}
+
 static void
 pdf_init_document(pdf_document *doc)
 {
@@ -1213,4 +1270,5 @@ pdf_init_document(pdf_document *doc)
 	doc->super.bound_page = pdf_bound_page_shim;
 	doc->super.run_page = pdf_run_page_shim;
 	doc->super.free_page = pdf_free_page_shim;
+	doc->super.meta = pdf_meta;
 }

@@ -114,7 +114,6 @@ public class MuPDFActivity extends Activity
 	public void onCreate(Bundle savedInstanceState)
 	{
 		super.onCreate(savedInstanceState);
-
 		mAlertBuilder = new AlertDialog.Builder(this);
 
 		if (core == null) {
@@ -459,7 +458,6 @@ public class MuPDFActivity extends Activity
 	@Override
 	protected void onPause() {
 		super.onPause();
-
 		killSearch();
 
 		if (mFileName != null && mDocView != null) {

@@ -46,26 +46,14 @@ static inline void
 fz_lock(fz_context *ctx, int lock)
 {
 	fz_lock_debug_lock(ctx, lock);
-<<<<<<< HEAD
-	LOGE("Trying to obtain lock");
 	ctx->locks->lock(ctx->locks->user, lock);
-	LOGE("Obtained lock");
-=======
-	ctx->locks->lock(ctx->locks->user, lock);
->>>>>>> 646fc97f1668107ef3af02c087f5bb86167de5b9
 }
 
 static inline void
 fz_unlock(fz_context *ctx, int lock)
 {
 	fz_lock_debug_unlock(ctx, lock);
-<<<<<<< HEAD
-	LOGE("Trying to unlock");
 	ctx->locks->unlock(ctx->locks->user, lock);
-	LOGE("Unlocked");
-=======
-	ctx->locks->unlock(ctx->locks->user, lock);
->>>>>>> 646fc97f1668107ef3af02c087f5bb86167de5b9
 }
 
 
@@ -1091,11 +1079,7 @@ struct fz_document_s
 	fz_rect (*bound_page)(fz_document *doc, fz_page *page);
 	void (*run_page)(fz_document *doc, fz_page *page, fz_device *dev, fz_matrix transform, fz_cookie *cookie);
 	void (*free_page)(fz_document *doc, fz_page *page);
+	int (*meta)(fz_document *doc, int key, void *ptr, int size);
 };
 
-<<<<<<< HEAD
-=======
-void *processNodes(void *args);
-
->>>>>>> 646fc97f1668107ef3af02c087f5bb86167de5b9
 #endif
