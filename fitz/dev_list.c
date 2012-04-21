@@ -596,20 +596,6 @@ fz_run_display_list(fz_display_list *list, fz_device *dev, fz_matrix top_ctm, fz
 	int empty;
 	int progress = 0;
 	
-	
-	//convert linked list to array of display nodes
-	//this is terrible terrible code lol
-	int count = 0;
-	for (node = list->first; node; node = node->next) {
-		count++;
-	}
-	fz_display_node **node_array = (fz_display_node **) malloc(count * sizeof(fz_display_node*));
-	count = 0;
-	for (node = list->first; node; node = node->next) {
-		node_array[count] = node;
-		count++;
-	}
-	
 	//LOGE("Count %d", count);
 	if (cookie)
 	{
@@ -617,11 +603,8 @@ fz_run_display_list(fz_display_list *list, fz_device *dev, fz_matrix top_ctm, fz
 		cookie->progress = 0;
 	}
 
-	//for (node = list->first; node; node = node->next)
-	int i = 0;
-	for (i = 0; i < count; i ++) 
+	for (node = list->first; node; node = node->next)
 	{
-		node = node_array[i];
 		/* Check the cookie for aborting */
 		if (cookie)
 		{
@@ -767,5 +750,5 @@ visible:
 			break;
 		}
 	}
-	free(node_array);
+	//free(node_array);
 }

@@ -9,6 +9,7 @@
 #include <pthread.h>
 
 #include "fitz.h"
+#include "fitz-internal.h"
 #include "mupdf.h"
 
 #define LOG_TAG "libmupdf"
@@ -231,17 +232,21 @@ renderer(void *data)
 	fz_matrix ctm = ((struct thread_data *) data)->ctm;
 	int thread_id = ((struct thread_data *) data)->thread_id;
 	
-	if (thread_id == 0) {
-		bbox.x1 = (bbox.x1 + bbox.x0)/2;
-	} else if (thread_id == 1) {
-		bbox.x0 = (bbox.x1 + bbox.x0)/2;
+	if (thread_id == 1) {
+		//bbox.x1 = (bbox.x1 + bbox.x0)/2;
+		//bbox.y0 = (bbox.y1 + bbox.y0)/2;
+		ctm = fz_concat(ctm, fz_translate(0, -2 * pix->h/2));
+		//pix->samples += (pix->h * pix->n * pix->w);
+	} else if (thread_id == 0) {
+		bbox.y1 = (bbox.y1 + bbox.y0)/2;
+		//pix->samples += (pix->h * pix->n * pix->w);
 	}
 	
 	// The context pointer is pointing to the main thread's
 	// context, so here we create a new context based on it for
 	// use in this thread.
 	fz_context *ctx2 = fz_clone_context(ctx);
-
+    //ctm = fz_concat(ctm, fz_scale(2, 1));
 	fz_device *dev = fz_new_draw_device(ctx2, pix);
 	//fz_run_display_list(list, dev, fz_identity, bbox, NULL);
 	fz_run_display_list(list, dev, ctm, bbox, NULL);
@@ -271,6 +276,10 @@ Java_com_artifex_mupdf_MuPDFCore_drawPage(JNIEnv *env, jobject thiz, jobject bit
 	//fz_var(pix);
 	fz_var(dev);
 
+	//patchW /= 2;
+	//patchH *= 2;
+	
+	
 	LOGI("In native method\n");
 	if ((ret = AndroidBitmap_getInfo(env, bitmap, &info)) < 0) {
 		LOGE("AndroidBitmap_getInfo() failed ! error=%d", ret);
@@ -292,7 +301,6 @@ Java_com_artifex_mupdf_MuPDFCore_drawPage(JNIEnv *env, jobject thiz, jobject bit
 	/* Call mupdf to render display list to screen */
 	LOGE("Rendering page=%dx%d patch=[%d,%d,%d,%d]",
 			pageW, pageH, patchX, patchY, patchW, patchH);
-
 	fz_try(ctx)
 	{
 		if (currentPageList == NULL)
@@ -319,20 +327,24 @@ Java_com_artifex_mupdf_MuPDFCore_drawPage(JNIEnv *env, jobject thiz, jobject bit
 		
 		zoom = resolution / 72;
 		ctm = fz_scale(zoom, zoom);
+		currentMediabox.y1 = (currentMediabox.y0 + currentMediabox.y1);
+		//currentMediabox.y1 = (currentMediabox.y0 + currentMediabox.x1)/2;
+		
 		bbox = fz_round_rect(fz_transform_rect(ctm,currentMediabox));
 		/* Now, adjust ctm so that it would give the correct page width
 		 * heights. */
-		xscale = (float)(pageW)/(float)(bbox.x1-bbox.x0);
-		yscale = (float)pageH/(float)(bbox.y1-bbox.y0);
+		xscale = ((float)(pageW)/(float)(bbox.x1-bbox.x0));
+		yscale = ((float)pageH/(float)(bbox.y1-bbox.y0));
 		ctm = fz_concat(ctm, fz_scale(xscale, yscale));
+		//currentMediabox.x1 = (currentMediabox.x0 + currentMediabox.x1)/2;
 		bbox = fz_round_rect(fz_transform_rect(ctm,currentMediabox));
-
-
+		//bbox.x0 = (bbox.x0 + bbox.x1)/2;
+		//ctm = fz_concat(ctm, fz_scale(0.5, 1));
 		fz_pixmap *pix = NULL;
 		pix = fz_new_pixmap_with_bbox_and_data(ctx, colorspace, rect, pixels);		
-		dev = fz_new_draw_device(ctx, pix);
+		//dev = fz_new_draw_device(ctx, pix);
 		
-		int count = 2;
+		int count = 1;
 		int j = 0;
 		pthread_t thread[count];
 		struct thread_data *data = malloc(count * sizeof (struct thread_data));
@@ -353,9 +365,11 @@ Java_com_artifex_mupdf_MuPDFCore_drawPage(JNIEnv *env, jobject thiz, jobject bit
 			data[j].ctx = ctx;
 			data[j].list = currentPageList;
 			data[j].bbox = bbox;
+			pix->h = pix->h / 2;
+			pix->samples += pix->h * pix->w * pix->n;
 			data[j].pix = pix;
 			data[j].ctm = ctm;
-			data[j].thread_id = j;
+			data[j].thread_id = 1;
 			
 			#ifdef TIME_DISPLAY_LIST
 			{
@@ -388,7 +402,7 @@ Java_com_artifex_mupdf_MuPDFCore_drawPage(JNIEnv *env, jobject thiz, jobject bit
 			//fz_drop_pixmap(ctx, data->pix);
 		}
 		
-		fz_free_device(dev);
+		//fz_free_device(dev);
 		dev = NULL;
 		fz_drop_pixmap(ctx, pix);
 		LOGE("Rendered");
