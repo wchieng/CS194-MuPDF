@@ -1,4 +1,4 @@
-Optimized PDF rendering for Android and iOS, based on the open source MuPDF library. This version is our final project for CS194-15 Engineering Parallel Software at UC Berkeley. 
+Optimized PDF rendering for Android, based on the open source MuPDF library. This version is our final project for CS194-15 Engineering Parallel Software at UC Berkeley. 
 
 -----
 About MuPDF
