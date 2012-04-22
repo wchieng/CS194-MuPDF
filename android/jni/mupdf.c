@@ -23,6 +23,7 @@
 #undef TIME_DISPLAY_LIST
 
 #define MAX_SEARCH_HITS (500)
+#define NUM_THREADS 4
 
 /* Globals */
 fz_colorspace *colorspace;
@@ -230,14 +231,22 @@ renderer(void *data)
 	fz_matrix ctm = ((struct thread_data *) data)->ctm;
 	int thread_id = ((struct thread_data *) data)->thread_id;
 	//shrink the bounding box to half
-	bbox.y1 = (bbox.y1/2) + bbox.y0;
+	bbox.y1 = (bbox.y1/NUM_THREADS) + bbox.y0;
+	
+	/*
 	if (thread_id == 1) {
-		ctm = fz_concat(ctm, fz_translate(0, -2 * pix->h/2));
+		ctm = fz_concat(ctm, fz_translate(0, -pix->h));
 		pix->samples += pix->h * pix->w * pix->n;
 		//pix->samples += (pix->h * pix->n * pix->w);
 	} else if (thread_id == 0) {
 		//bbox.y1 = (bbox.y1 + bbox.y0)/2;
 		//pix->samples += (pix->h * pix->n * pix->w);
+	}
+	*/
+	
+	if (thread_id > 0) {
+		ctm = fz_concat(ctm, fz_translate(0, thread_id * -pix->h));
+		pix->samples += thread_id * (pix->h * pix->w * pix->n);
 	}
 	
 	// The context pointer is pointing to the main thread's
@@ -327,25 +336,14 @@ Java_com_artifex_mupdf_MuPDFCore_drawPage(JNIEnv *env, jobject thiz, jobject bit
 		//ctm = fz_concat(ctm, fz_scale(0.5, 1));
 		fz_pixmap *pix = NULL;
 		pix = fz_new_pixmap_with_bbox_and_data(ctx, colorspace, rect, pixels);		
-		pix->h = pix->h / 2;
+		pix->h = pix->h / NUM_THREADS;
 	
 		//dev = fz_new_draw_device(ctx, pix);
 		
-		int count = 2;
+		int count = NUM_THREADS;
 		int j = 0;
 		pthread_t thread[count];
 		struct thread_data *data = malloc(count * sizeof (struct thread_data));
-		
-		//pix->h = pix->h/2;
-		
-		/* TESTING; this looks terrible */
-		//fz_pixmap *th0 = fz_new_pixmap_with_bbox_and_data(ctx, colorspace, rect, pixels);
-		//th0->h = th0->h/2;
-		
-		//fz_pixmap *th1 = fz_new_pixmap_with_bbox_and_data(ctx, colorspace, rect, pixels);
-		//th1->h = th1->h/2;
-		//th1->samples += th1->h * th1->w * th1->n;
-		/* END TESTING */
 		
 		if (currentPageList == NULL)
 		{
@@ -367,17 +365,6 @@ Java_com_artifex_mupdf_MuPDFCore_drawPage(JNIEnv *env, jobject thiz, jobject bit
 			data[j].ctx = ctx;
 			data[j].list = currentPageList;
 			data[j].bbox = bbox;
-
-			//data[j].pix = newpix;
-			
-			/* pix->samples is the block of pixels */
-			
-			//pix->h = pix->h/2;
-			//if (j > 0) {
-				//data[j].pix->samples += j*(pix->h * pix->w * pix->n);
-			//}
-			//data[j].pix = pix;
-
 			data[j].ctm = ctm;
 			data[j].thread_id = j;
 			
