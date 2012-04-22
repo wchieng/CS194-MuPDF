@@ -13,8 +13,7 @@
     
     <application android:label="@string/app_name"
                  android:icon="@drawable/icon"
-                 android:debuggable="true"
-                 android:hardwareAccelerated="true">
+                 android:debuggable="true">
         <activity android:name="ChoosePDFActivity"
                   android:label="@string/picker_title">
             <intent-filter>

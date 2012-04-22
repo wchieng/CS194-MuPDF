@@ -75,7 +75,7 @@ public abstract class PageView extends ViewGroup {
 		mContext    = c;
 		mParentSize = parentSize;
 		setBackgroundColor(BACKGROUND_COLOR);
-		mUsingHardwareAcceleration = Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB;
+		mUsingHardwareAcceleration = Build.VERSION.SDK_INT >= Build.VERSION_CODES.BASE;
 	}
 
 	protected abstract void drawPage(Bitmap bm, int sizeX, int sizeY, int patchX, int patchY, int patchWidth, int patchHeight);

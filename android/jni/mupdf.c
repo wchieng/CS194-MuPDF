@@ -238,7 +238,7 @@ renderer(void *data)
 		ctm = fz_concat(ctm, fz_translate(0, -2 * pix->h/2));
 		//pix->samples += (pix->h * pix->n * pix->w);
 	} else if (thread_id == 0) {
-		bbox.y1 = (bbox.y1 + bbox.y0)/2;
+		//bbox.y1 = (bbox.y1 + bbox.y0)/2;
 		//pix->samples += (pix->h * pix->n * pix->w);
 	}
 	
@@ -344,32 +344,52 @@ Java_com_artifex_mupdf_MuPDFCore_drawPage(JNIEnv *env, jobject thiz, jobject bit
 		pix = fz_new_pixmap_with_bbox_and_data(ctx, colorspace, rect, pixels);		
 		//dev = fz_new_draw_device(ctx, pix);
 		
-		int count = 1;
+		int count = 2;
 		int j = 0;
 		pthread_t thread[count];
 		struct thread_data *data = malloc(count * sizeof (struct thread_data));
+		
+		pix->h = pix->h/2;
+		
+		/* TESTING; this looks terrible */
+		//fz_pixmap *th0 = fz_new_pixmap_with_bbox_and_data(ctx, colorspace, rect, pixels);
+		//th0->h = th0->h/2;
+		
+		//fz_pixmap *th1 = fz_new_pixmap_with_bbox_and_data(ctx, colorspace, rect, pixels);
+		//th1->h = th1->h/2;
+		//th1->samples += th1->h * th1->w * th1->n;
+		/* END TESTING */
+		
 		for (j = 0; j < count; j++) {
 			
-			//fz_pixmap *pix = NULL;
+			fz_pixmap *newpix = NULL;
 			
-			//pix = fz_new_pixmap_with_bbox(ctx, fz_device_rgb, bbox);
+			newpix = fz_new_pixmap_with_bbox_and_data(ctx, colorspace, rect, pixels);
 			
+			// MOVE THIS OUT
 			if (currentPageList == NULL)
 			{
 				fz_clear_pixmap_with_value(ctx, pix, 0xd0);
 				break;
 			}
 			fz_clear_pixmap_with_value(ctx, pix, 0xff);
-		
+			// END MOVE
 			
 			data[j].ctx = ctx;
 			data[j].list = currentPageList;
 			data[j].bbox = bbox;
-			pix->h = pix->h / 2;
-			pix->samples += pix->h * pix->w * pix->n;
-			data[j].pix = pix;
+			data[j].pix = newpix;
+			
+			/* pix->samples is the block of pixels */
+			
+			//pix->h = pix->h/2;
+			if (j > 0) {
+				data[j].pix->samples += j*(pix->h * pix->w * pix->n);
+			}
+			//data[j].pix = pix;
+			
 			data[j].ctm = ctm;
-			data[j].thread_id = 1;
+			data[j].thread_id = j;
 			
 			#ifdef TIME_DISPLAY_LIST
 			{
@@ -379,7 +399,7 @@ Java_com_artifex_mupdf_MuPDFCore_drawPage(JNIEnv *env, jobject thiz, jobject bit
 				time = clock();
 				for (i=0; i<100;i++) {
 			#endif
-				LOGE("Creating Pthread..");
+				LOGE("Creating Pthread %d..", j);
 				if (pthread_create(&thread[j], NULL, renderer, &data[j]) < 0) {
 					LOGE("FAILED TO CREATE PTHREAD");
 				}
