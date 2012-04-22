@@ -347,20 +347,17 @@ Java_com_artifex_mupdf_MuPDFCore_drawPage(JNIEnv *env, jobject thiz, jobject bit
 		//th1->samples += th1->h * th1->w * th1->n;
 		/* END TESTING */
 		
+		if (currentPageList == NULL)
+		{
+			fz_clear_pixmap_with_value(ctx, pix, 0xd0);
+			break;
+		}
+		fz_clear_pixmap_with_value(ctx, pix, 0xff);
+		
 		for (j = 0; j < count; j++) {
-			
 			//fz_pixmap *newpix = NULL;
 			//newpix = fz_new_pixmap_with_bbox_and_data(ctx, colorspace, rect, pixels);
 			
-			// MOVE THIS OUT
-			if (currentPageList == NULL)
-			{
-				fz_clear_pixmap_with_value(ctx, pix, 0xd0);
-				break;
-			}
-			fz_clear_pixmap_with_value(ctx, pix, 0xff);
-			// END MOVE
-		
 			//clone the pixmap
 			fz_pixmap *pix2 = fz_new_pixmap_with_data(ctx, pix->colorspace, pix->w, pix->h, pix->samples);
 			pix2->x = pix->x;
