@@ -1,5 +1,7 @@
 package com.artifex.mupdf;
 
+import com.artifex.cs194mupdf.R;
+
 public class OutlineActivityData {
 	public OutlineItem items[];
 	public int         position;

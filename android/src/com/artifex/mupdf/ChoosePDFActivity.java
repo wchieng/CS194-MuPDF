@@ -16,6 +16,7 @@ import android.os.Environment;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
+import com.artifex.cs194mupdf.R;
 
 public class ChoosePDFActivity extends ListActivity {
 	private File    mDirectory;

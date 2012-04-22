@@ -8,6 +8,7 @@ import android.util.SparseArray;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
+import com.artifex.cs194mupdf.R;
 
 public class MuPDFPageAdapter extends BaseAdapter {
 	private final Context mContext;

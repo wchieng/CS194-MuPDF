@@ -15,6 +15,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
+import com.artifex.cs194mupdf.R;
 
 class PatchInfo {
 	public Bitmap bm;
