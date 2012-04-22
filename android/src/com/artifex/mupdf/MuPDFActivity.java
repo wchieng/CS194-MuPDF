@@ -30,6 +30,7 @@ import android.widget.RelativeLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.ViewSwitcher;
+import com.artifex.cs194mupdf.R;
 
 class SearchTaskResult {
 	public final int   pageNumber;

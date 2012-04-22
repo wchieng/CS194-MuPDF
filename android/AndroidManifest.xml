@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-      package="com.artifex.mupdf"
+      package="com.artifex.cs194mupdf"
       android:versionCode="1"
       android:versionName="1.0">
     <supports-screens android:smallScreens="true"
@@ -14,14 +14,14 @@
     <application android:label="@string/app_name"
                  android:icon="@drawable/icon"
                  android:debuggable="true">
-        <activity android:name="ChoosePDFActivity"
+        <activity android:name="com.artifex.mupdf.ChoosePDFActivity"
                   android:label="@string/picker_title">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-	<activity android:name="MuPDFActivity"
+	<activity android:name="com.artifex.mupdf.MuPDFActivity"
                   android:label="@string/app_name"
 		  android:theme="@android:style/Theme.NoTitleBar">
             <intent-filter>
@@ -67,7 +67,7 @@
                 <data android:host="*"/>
             </intent-filter>
         </activity>
-        <activity android:name="OutlineActivity"
+        <activity android:name="com.artifex.mupdf.OutlineActivity"
                   android:label="@string/outline_title">
 	</activity>
     </application>

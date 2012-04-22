@@ -87,9 +87,7 @@ Java_com_artifex_mupdf_MuPDFCore_openFile(JNIEnv * env, jobject thiz, jstring jf
 	locks.unlock = unlock_mutex;
 	
 	/* 128 MB store for low memory devices. Tweak as necessary. */
-	ctx = fz_new_context(NULL, &locks, 256 << 20);
-	//ctx = fz_new_context(NULL, NULL, 256 << 20);
-	
+	ctx = fz_new_context(NULL, &locks, 512 << 20);
 	if (!ctx)
 	{
 		LOGE("Failed to initialise context");
@@ -231,11 +229,11 @@ renderer(void *data)
 	fz_pixmap *pix = ((struct thread_data *) data)->pix;
 	fz_matrix ctm = ((struct thread_data *) data)->ctm;
 	int thread_id = ((struct thread_data *) data)->thread_id;
-	
+	//shrink the bounding box to half
+	bbox.y1 = (bbox.y1/2) + bbox.y0;
 	if (thread_id == 1) {
-		//bbox.x1 = (bbox.x1 + bbox.x0)/2;
-		//bbox.y0 = (bbox.y1 + bbox.y0)/2;
 		ctm = fz_concat(ctm, fz_translate(0, -2 * pix->h/2));
+		pix->samples += pix->h * pix->w * pix->n;
 		//pix->samples += (pix->h * pix->n * pix->w);
 	} else if (thread_id == 0) {
 		//bbox.y1 = (bbox.y1 + bbox.y0)/2;
@@ -246,9 +244,7 @@ renderer(void *data)
 	// context, so here we create a new context based on it for
 	// use in this thread.
 	fz_context *ctx2 = fz_clone_context(ctx);
-    //ctm = fz_concat(ctm, fz_scale(2, 1));
 	fz_device *dev = fz_new_draw_device(ctx2, pix);
-	//fz_run_display_list(list, dev, fz_identity, bbox, NULL);
 	fz_run_display_list(list, dev, ctm, bbox, NULL);
 	fz_free_device(dev);
 
@@ -305,31 +301,20 @@ Java_com_artifex_mupdf_MuPDFCore_drawPage(JNIEnv *env, jobject thiz, jobject bit
 	{
 		if (currentPageList == NULL)
 		{
+			LOGE("Start list construction");
 			/* Render to list */
 			currentPageList = fz_new_display_list(ctx);
 			dev = fz_new_list_device(ctx, currentPageList);
 			fz_run_page(doc, currentPage, dev, fz_identity, NULL);
+			LOGE("End list construction");
 		}
 		rect.x0 = patchX;
 		rect.y0 = patchY;
 		rect.x1 = patchX + patchW;
 		rect.y1 = patchY + patchH;
 		
-		/*pix = fz_new_pixmap_with_bbox_and_data(ctx, colorspace, rect, pixels);
-		if (currentPageList == NULL)
-		{
-			fz_clear_pixmap_with_value(ctx, pix, 0xd0);
-			break;
-		}
-		fz_clear_pixmap_with_value(ctx, pix, 0xcc);
-		*/
-		
-		
 		zoom = resolution / 72;
 		ctm = fz_scale(zoom, zoom);
-		currentMediabox.y1 = (currentMediabox.y0 + currentMediabox.y1);
-		//currentMediabox.y1 = (currentMediabox.y0 + currentMediabox.x1)/2;
-		
 		bbox = fz_round_rect(fz_transform_rect(ctm,currentMediabox));
 		/* Now, adjust ctm so that it would give the correct page width
 		 * heights. */
@@ -342,6 +327,8 @@ Java_com_artifex_mupdf_MuPDFCore_drawPage(JNIEnv *env, jobject thiz, jobject bit
 		//ctm = fz_concat(ctm, fz_scale(0.5, 1));
 		fz_pixmap *pix = NULL;
 		pix = fz_new_pixmap_with_bbox_and_data(ctx, colorspace, rect, pixels);		
+		pix->h = pix->h / 2;
+	
 		//dev = fz_new_draw_device(ctx, pix);
 		
 		int count = 2;
@@ -349,7 +336,7 @@ Java_com_artifex_mupdf_MuPDFCore_drawPage(JNIEnv *env, jobject thiz, jobject bit
 		pthread_t thread[count];
 		struct thread_data *data = malloc(count * sizeof (struct thread_data));
 		
-		pix->h = pix->h/2;
+		//pix->h = pix->h/2;
 		
 		/* TESTING; this looks terrible */
 		//fz_pixmap *th0 = fz_new_pixmap_with_bbox_and_data(ctx, colorspace, rect, pixels);
@@ -362,9 +349,8 @@ Java_com_artifex_mupdf_MuPDFCore_drawPage(JNIEnv *env, jobject thiz, jobject bit
 		
 		for (j = 0; j < count; j++) {
 			
-			fz_pixmap *newpix = NULL;
-			
-			newpix = fz_new_pixmap_with_bbox_and_data(ctx, colorspace, rect, pixels);
+			//fz_pixmap *newpix = NULL;
+			//newpix = fz_new_pixmap_with_bbox_and_data(ctx, colorspace, rect, pixels);
 			
 			// MOVE THIS OUT
 			if (currentPageList == NULL)
@@ -374,20 +360,27 @@ Java_com_artifex_mupdf_MuPDFCore_drawPage(JNIEnv *env, jobject thiz, jobject bit
 			}
 			fz_clear_pixmap_with_value(ctx, pix, 0xff);
 			// END MOVE
-			
+		
+			//clone the pixmap
+			fz_pixmap *pix2 = fz_new_pixmap_with_data(ctx, pix->colorspace, pix->w, pix->h, pix->samples);
+			pix2->x = pix->x;
+			pix2->y = pix->y;
+	
+			data[j].pix = pix2;			
 			data[j].ctx = ctx;
 			data[j].list = currentPageList;
 			data[j].bbox = bbox;
-			data[j].pix = newpix;
+
+			//data[j].pix = newpix;
 			
 			/* pix->samples is the block of pixels */
 			
 			//pix->h = pix->h/2;
-			if (j > 0) {
-				data[j].pix->samples += j*(pix->h * pix->w * pix->n);
-			}
+			//if (j > 0) {
+				//data[j].pix->samples += j*(pix->h * pix->w * pix->n);
+			//}
 			//data[j].pix = pix;
-			
+
 			data[j].ctm = ctm;
 			data[j].thread_id = j;
 			

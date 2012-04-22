@@ -3,6 +3,7 @@ package com.artifex.mupdf;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Point;
+import com.artifex.cs194mupdf.R;
 
 public class MuPDFPageView extends PageView {
 	private final MuPDFCore mCore;

@@ -15,6 +15,7 @@ import android.view.View;
 import android.widget.Adapter;
 import android.widget.AdapterView;
 import android.widget.Scroller;
+import com.artifex.cs194mupdf.R;
 
 public class ReaderView extends AdapterView<Adapter>
                         implements GestureDetector.OnGestureListener,
