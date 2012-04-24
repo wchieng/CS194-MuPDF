@@ -25,6 +25,8 @@
 #define MAX_SEARCH_HITS (500)
 #define NUM_THREADS 4
 
+#define BILLION 1E9
+
 /* Globals */
 fz_colorspace *colorspace;
 fz_document *doc;
@@ -40,7 +42,7 @@ fz_page *currentPage = NULL;
 fz_bbox *hit_bbox = NULL;
 fz_locks_context locks;	
 pthread_mutex_t mutex[FZ_LOCK_MAX];
-	
+
 void lock_mutex(void *user, int lock)
 {
 	//char buffer[50];
@@ -233,17 +235,6 @@ renderer(void *data)
 	//shrink the bounding box to half
 	bbox.y1 = (bbox.y1/NUM_THREADS) + bbox.y0;
 	
-	/*
-	if (thread_id == 1) {
-		ctm = fz_concat(ctm, fz_translate(0, -pix->h));
-		pix->samples += pix->h * pix->w * pix->n;
-		//pix->samples += (pix->h * pix->n * pix->w);
-	} else if (thread_id == 0) {
-		//bbox.y1 = (bbox.y1 + bbox.y0)/2;
-		//pix->samples += (pix->h * pix->n * pix->w);
-	}
-	*/
-	
 	if (thread_id > 0) {
 		ctm = fz_concat(ctm, fz_translate(0, thread_id * -pix->h));
 		pix->samples += thread_id * (pix->h * pix->w * pix->n);
@@ -274,17 +265,13 @@ Java_com_artifex_mupdf_MuPDFCore_drawPage(JNIEnv *env, jobject thiz, jobject bit
 	float zoom;
 	fz_matrix ctm;
 	fz_bbox bbox;
-	//fz_pixmap *pix = NULL;
 	float xscale, yscale;
 	fz_bbox rect;
-
-	//fz_var(pix);
+	double  toverall, tpar;
+	struct timespec roverall, rpar, rend;
+	
 	fz_var(dev);
 
-	//patchW /= 2;
-	//patchH *= 2;
-	
-	
 	LOGI("In native method\n");
 	if ((ret = AndroidBitmap_getInfo(env, bitmap, &info)) < 0) {
 		LOGE("AndroidBitmap_getInfo() failed ! error=%d", ret);
@@ -306,6 +293,7 @@ Java_com_artifex_mupdf_MuPDFCore_drawPage(JNIEnv *env, jobject thiz, jobject bit
 	/* Call mupdf to render display list to screen */
 	LOGE("Rendering page=%dx%d patch=[%d,%d,%d,%d]",
 			pageW, pageH, patchX, patchY, patchW, patchH);
+	clock_gettime(CLOCK_REALTIME, &roverall);
 	fz_try(ctx)
 	{
 		if (currentPageList == NULL)
@@ -317,6 +305,8 @@ Java_com_artifex_mupdf_MuPDFCore_drawPage(JNIEnv *env, jobject thiz, jobject bit
 			fz_run_page(doc, currentPage, dev, fz_identity, NULL);
 			LOGE("End list construction");
 		}
+		LOGE("Starting render..");
+		clock_gettime(CLOCK_REALTIME, &rpar);
 		rect.x0 = patchX;
 		rect.y0 = patchY;
 		rect.x1 = patchX + patchW;
@@ -330,16 +320,11 @@ Java_com_artifex_mupdf_MuPDFCore_drawPage(JNIEnv *env, jobject thiz, jobject bit
 		xscale = ((float)(pageW)/(float)(bbox.x1-bbox.x0));
 		yscale = ((float)pageH/(float)(bbox.y1-bbox.y0));
 		ctm = fz_concat(ctm, fz_scale(xscale, yscale));
-		//currentMediabox.x1 = (currentMediabox.x0 + currentMediabox.x1)/2;
 		bbox = fz_round_rect(fz_transform_rect(ctm,currentMediabox));
-		//bbox.x0 = (bbox.x0 + bbox.x1)/2;
-		//ctm = fz_concat(ctm, fz_scale(0.5, 1));
 		fz_pixmap *pix = NULL;
 		pix = fz_new_pixmap_with_bbox_and_data(ctx, colorspace, rect, pixels);		
 		pix->h = pix->h / NUM_THREADS;
 	
-		//dev = fz_new_draw_device(ctx, pix);
-		
 		int count = NUM_THREADS;
 		int j = 0;
 		pthread_t thread[count];
@@ -353,8 +338,6 @@ Java_com_artifex_mupdf_MuPDFCore_drawPage(JNIEnv *env, jobject thiz, jobject bit
 		fz_clear_pixmap_with_value(ctx, pix, 0xff);
 		
 		for (j = 0; j < count; j++) {
-			//fz_pixmap *newpix = NULL;
-			//newpix = fz_new_pixmap_with_bbox_and_data(ctx, colorspace, rect, pixels);
 			
 			//clone the pixmap
 			fz_pixmap *pix2 = fz_new_pixmap_with_data(ctx, pix->colorspace, pix->w, pix->h, pix->samples);
@@ -380,7 +363,6 @@ Java_com_artifex_mupdf_MuPDFCore_drawPage(JNIEnv *env, jobject thiz, jobject bit
 				if (pthread_create(&thread[j], NULL, renderer, &data[j]) < 0) {
 					LOGE("FAILED TO CREATE PTHREAD");
 				}
-				//fz_run_display_list(currentPageList, dev, ctm, bbox, NULL);
 			#ifdef TIME_DISPLAY_LIST
 				}
 				time = clock() - time;
@@ -403,6 +385,18 @@ Java_com_artifex_mupdf_MuPDFCore_drawPage(JNIEnv *env, jobject thiz, jobject bit
 		dev = NULL;
 		fz_drop_pixmap(ctx, pix);
 		LOGE("Rendered");
+		clock_gettime(CLOCK_REALTIME, &rend);
+		double overallt = ( rend.tv_sec - roverall.tv_sec )
+		  + ( rend.tv_nsec - roverall.tv_nsec )
+		  / BILLION;
+		double partt = ( rend.tv_sec - rpar.tv_sec )
+		  + ( rend.tv_nsec - rpar.tv_nsec )
+		  / BILLION;
+		char output[50];
+		sprintf(output, "Time overall: %lf", overallt);
+		LOGE(output);
+		sprintf(output, "Time par: %lf", partt);
+		LOGE(output);
 	}
 	fz_catch(ctx)
 	{
